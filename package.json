@@ -1,0 +1,25 @@
+{
+    "author": "masmddr",
+    "dependencies": {},
+    "keywords": [],
+    "name": "simplecal",
+    "pebble": {
+        "displayName": "SimpleCal",
+        "enableMultiJS": true,
+        "messageKeys": [],
+        "projectType": "native",
+        "resources": {
+            "media": []
+        },
+        "sdkVersion": "3",
+        "targetPlatforms": [
+            "aplite",
+            "basalt"
+        ],
+        "uuid": "2462126a-804d-4836-9903-2bf4976b81df",
+        "watchapp": {
+            "watchface": true
+        }
+    },
+    "version": "1.22.0"
+}
