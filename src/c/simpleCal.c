@@ -208,9 +208,7 @@ void main_window_unload(Window *window){
 }
 
 void tick_handler(struct tm *tick_time, TimeUnits units_changed){
-#if SECONDS
-	update_seconds(tick_time);	
-#endif
+
 	if((tick_time->tm_sec % 10) == 0){
 		if(tick_time->tm_sec == 0){
 			update_time(tick_time); 
@@ -224,7 +222,10 @@ void tick_handler(struct tm *tick_time, TimeUnits units_changed){
 			update_calendar();
 		}
 	}
-		
+#if SECONDS
+	update_seconds(tick_time);	
+#endif
+	
 #if CHIME
 	if((tick_time->tm_sec == 0) && (tick_time->tm_min == 0) && ((tick_time->tm_hour >= 7) && (tick_time->tm_hour <= 19))){
 		vibrate_chime();		
