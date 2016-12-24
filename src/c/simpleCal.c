@@ -3,12 +3,16 @@
 #define DEBUG 0
 #define CHIME 0
 #define SECONDS 0
+#define SECONDS_BARS 0
 
 static Window *s_main_window; // Main window
 static TextLayer *s_battery_status_layer;	// Battery status layer
 static TextLayer *s_time_layer;	// Time layer
 #if SECONDS
-static TextLayer *s_seconds_layer[5]; // Seconds layer
+static TextLayer *s_seconds_layer; // Seconds layer
+#endif
+#if SECONDS_BARS
+static TextLayer *s_seconds_bar_layer[5]; // Seconds bar layer
 #endif
 static TextLayer *s_today_date_layer; // Date layer
 static TextLayer *s_today_date_underscore_layer; // Underscore below the date
@@ -27,7 +31,10 @@ void update_battery_status(BatteryChargeState charge_state);
 void update_calendar(); // Update the calendar layer
 void update_date(struct tm *tick_time); // Update the date line layer
 #if SECONDS
-void update_seconds(struct tm *tick_time); // Update seconds bars
+void update_seconds(struct tm *tick_time); // Update seconds
+#endif
+#if SECONDS_BARS
+void update_seconds_bar(struct tm *tick_time); // Update seconds bars
 #endif
 void update_time(struct tm *tick_time); // Update the time layer
 #if CHIME
@@ -59,7 +66,7 @@ void init(){
 							  );
 	// Show the Window on the watch, with animated=false
 	window_stack_push(s_main_window, false);
-#if SECONDS
+#if SECONDS_BARS || SECONDS
 	tick_timer_service_subscribe(SECOND_UNIT, tick_handler); // Register with TickTimerService for seconds
 #else
 	tick_timer_service_subscribe(MINUTE_UNIT, tick_handler); // Register with TickTimerService for minutes
@@ -70,6 +77,9 @@ void init(){
 	update_time(t);
 #if SECONDS
 	update_seconds(t);
+#endif
+#if SECONDS_BARS
+	update_seconds_bar(t);
 #endif
 	update_date(t);
 	update_calendar();
@@ -92,7 +102,6 @@ void main_window_load(Window *window){
 	// Time layer
 	s_time_layer = text_layer_create(GRect(0, 15, 100, 30));
 	text_layer_set_background_color(s_time_layer, GColorClear);
-	
 	text_layer_set_text_color(s_time_layer, GColorWhite);
 	text_layer_set_font(s_time_layer, fonts_get_system_font(FONT_KEY_BITHAM_30_BLACK));
 	text_layer_set_text_alignment(s_time_layer, GTextAlignmentLeft);
@@ -100,10 +109,20 @@ void main_window_load(Window *window){
 	
 #if SECONDS
 	// Seconds layer
+	s_seconds_layer = text_layer_create(GRect(0, 31, 20, 15));
+	text_layer_set_background_color(s_seconds_layer, GColorClear);
+	text_layer_set_text_color(s_seconds_layer, GColorWhite);
+	text_layer_set_font(s_seconds_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
+	text_layer_set_text_alignment(s_seconds_layer, GTextAlignmentRight);
+	layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_seconds_layer));
+#endif
+	
+#if SECONDS_BARS
+	// Seconds layer
 	for(i = 0; i < 5; i++){
-		s_seconds_layer[i] = text_layer_create(GRect(142, 111 - (20 * i), 2, 10));
-		text_layer_set_background_color(s_seconds_layer[i], GColorClear);
-		layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_seconds_layer[i]));
+		s_seconds_bar_layer[i] = text_layer_create(GRect(142, 111 - (20 * i), 2, 10));
+		text_layer_set_background_color(s_seconds_bar_layer[i], GColorClear);
+		layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_seconds_bar_layer[i]));
 	}
 #endif
 	
@@ -165,16 +184,19 @@ void main_window_unload(Window *window){
 #endif
 	text_layer_destroy(s_today_date_underscore_layer);
 	text_layer_destroy(s_today_date_layer);
+#if SECONDS
+	text_layer_destroy(s_seconds_layer);
+#endif
+#if SECONDS_BARS
 	for(i = 0; i < 5; i++){
 #if DEBUG
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "Unloading s_seconds_layer[%d]", i);
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Unloading s_seconds_bar_layer[%d]", i);
 #endif
-#if SECONDS
-		text_layer_destroy(s_seconds_layer[i]);
-#endif
+		text_layer_destroy(s_seconds_bar_layer[i]);
 	}
+#endif
 #if DEBUG
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "Finished s_seconds_layer unload");
+	APP_LOG(APP_LOG_LEVEL_DEBUG, "Finished s_seconds_bar_layer unload");
 #endif
 	text_layer_destroy(s_time_layer);
 	text_layer_destroy(s_battery_status_layer);
@@ -186,12 +208,15 @@ void main_window_unload(Window *window){
 }
 
 void tick_handler(struct tm *tick_time, TimeUnits units_changed){
+#if SECONDS
+	update_seconds(tick_time);	
+#endif
 	if((tick_time->tm_sec % 10) == 0){
 		if(tick_time->tm_sec == 0){
 			update_time(tick_time); 
 		}
-#if SECONDS
-		update_seconds(tick_time);
+#if SECONDS_BARS
+		update_seconds_bar(tick_time);
 #endif
 		// Check if it's midnight to update the date and calendar
 		if( (tick_time->tm_hour == 0) && (tick_time->tm_min == 0)){
@@ -287,13 +312,28 @@ void update_date(struct tm *tick_time){
 
 #if SECONDS
 void update_seconds(struct tm *tick_time){
+	static char buffer_seconds[4];
+	
+  	strftime(buffer_seconds, sizeof(buffer_seconds), ":%S", tick_time);
+	text_layer_set_text(s_seconds_layer, buffer_seconds);
+	
+	GSize time_layer_size = text_layer_get_content_size(s_time_layer);
+	GSize seconds_layer_size = text_layer_get_content_size(s_seconds_layer);
+	seconds_layer_size.w = time_layer_size.w + seconds_layer_size.w;
+	text_layer_set_size(s_seconds_layer, seconds_layer_size);
+	
+}
+#endif
+
+#if SECONDS_BARS
+void update_seconds_bar(struct tm *tick_time){
 	int bars = (int)(tick_time->tm_sec / 10);
 	int i;
 	for(i = 0; i < bars ; i++){
-		text_layer_set_background_color(s_seconds_layer[i], GColorWhite);
+		text_layer_set_background_color(s_seconds_bar_layer[i], GColorWhite);
 	}
 	while(i < 5){
-		text_layer_set_background_color(s_seconds_layer[i], GColorClear);
+		text_layer_set_background_color(s_seconds_bar_layer[i], GColorClear);
 		i++;
 	}
 }
@@ -301,15 +341,16 @@ void update_seconds(struct tm *tick_time){
 
 void update_time(struct tm *tick_time){
 	static char buffer_time[6];
-
+	
 	if(clock_is_24h_style() == true) {
   		strftime(buffer_time, sizeof(buffer_time), "%H:%M", tick_time);
  	} else{
   		strftime(buffer_time, sizeof(buffer_time), "%I:%M", tick_time);
 	}
-
 	text_layer_set_text(s_time_layer, buffer_time);
+	
 }
+
 #if CHIME
 void vibrate_chime(){
 	vibes_short_pulse();
